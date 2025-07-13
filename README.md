@@ -12,6 +12,7 @@ A production-ready real-time voice conversational AI system built with Azure ser
 - **Production Ready**: Monitoring, logging, security, and deployment automation
 
 ## Architecture
+<img width="1600" height="522" alt="image" src="https://github.com/user-attachments/assets/a9b72fcb-7ece-4b0a-b85b-88411197f89a" />
 
 ```
 Frontend (WebSocket) → FastAPI Backend → Azure Services
