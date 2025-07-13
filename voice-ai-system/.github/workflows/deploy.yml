@@ -1,0 +1,65 @@
+name: Deploy Voice AI to Azure
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  AZURE_CONTAINERAPP_NAME: voice-ai-app
+  AZURE_GROUP_NAME: voice-ai-rg
+  AZURE_CONTAINER_REGISTRY: voiceairegistry
+  IMAGE_NAME: voice-ai
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest
+
+    - name: Run tests
+      run: |
+        pytest tests/ -v
+
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+    - name: Build and push Docker image
+      run: |
+        az acr build \
+          --registry ${{ env.AZURE_CONTAINER_REGISTRY }} \
+          --image ${{ env.IMAGE_NAME }}:${{ github.sha }} \
+          --file Dockerfile \
+          .
+
+    - name: Deploy to Container Apps
+      uses: azure/container-apps-deploy-action@v1
+      with:
+        containerAppName: ${{ env.AZURE_CONTAINERAPP_NAME }}
+        resourceGroup: ${{ env.AZURE_GROUP_NAME }}
+        imageToDeploy: ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+    - name: Run integration tests
+      run: |
+        python -m pytest tests/integration/ -v 
