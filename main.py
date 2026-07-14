@@ -22,6 +22,9 @@ from azure.search.documents.models import VectorizedQuery
 from azure.core.credentials import AzureKeyCredential
 from dotenv import load_dotenv
 
+from metrics import pipeline_metrics
+from session_store import SessionStore
+
 # Load environment variables from .env (no-op if the file doesn't exist)
 load_dotenv()
 
@@ -131,8 +134,11 @@ class ConversationSession:
     def get_context(self) -> str:
         return "\n".join([f"{msg['role']}: {msg['content']}" for msg in self.history[-10:]])
 
-# Global session storage (use Redis in production)
-sessions: Dict[str, ConversationSession] = {}
+# Bounded session storage with TTL eviction (swap for Redis when scaling out).
+# Sessions idle for an hour are expired lazily; at most 1000 live sessions.
+SESSION_TTL_SECONDS = float(os.getenv("SESSION_TTL_SECONDS", "3600"))
+SESSION_MAX_COUNT = int(os.getenv("SESSION_MAX_COUNT", "1000"))
+sessions = SessionStore(ttl_seconds=SESSION_TTL_SECONDS, max_sessions=SESSION_MAX_COUNT)
 
 # WebSocket connection manager
 class ConnectionManager:
@@ -260,6 +266,16 @@ rag_processor = RAGProcessor(search_client, openai_client)
 async def health_check():
     return {"status": "healthy", "timestamp": datetime.now().isoformat()}
 
+@app.get("/metrics")
+async def get_metrics():
+    """Latency percentiles (p50/p95/p99) per pipeline stage plus session stats.
+
+    Stages: stt, rag_retrieval, llm, tts, and the end-to-end converse pipeline.
+    """
+    summary = pipeline_metrics.summary()
+    summary["sessions"] = sessions.stats()
+    return summary
+
 @app.post("/transcribe")
 async def transcribe_audio(request: TranscribeRequest):
     """Convert audio to text using Azure Speech STT"""
@@ -299,10 +315,13 @@ async def transcribe_audio(request: TranscribeRequest):
             transcription = ""
         else:  # Canceled or other failure
             details = getattr(result, "cancellation_details", None)
+            pipeline_metrics.record_error("stt")
             raise HTTPException(
                 status_code=500,
                 detail=f"Speech recognition failed: {details.reason if details else result.reason}"
             )
+
+        pipeline_metrics.record("stt", processing_time)
 
         return {
             "transcription": transcription,
@@ -313,6 +332,7 @@ async def transcribe_audio(request: TranscribeRequest):
     except HTTPException:
         raise
     except Exception as e:
+        pipeline_metrics.record_error("stt")
         logger.error(f"Transcription error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -329,14 +349,16 @@ async def chat(request: ChatRequest):
         session = sessions[session_id]
 
         # Retrieve RAG context
-        context = await rag_processor.retrieve_context(request.message)
+        with pipeline_metrics.track("rag_retrieval"):
+            context = await rag_processor.retrieve_context(request.message)
 
         # Generate response
-        response = await rag_processor.generate_response(
-            request.message,
-            context,
-            session.get_context()
-        )
+        with pipeline_metrics.track("llm"):
+            response = await rag_processor.generate_response(
+                request.message,
+                context,
+                session.get_context()
+            )
 
         # Update session
         session.add_message("user", request.message)
@@ -377,6 +399,7 @@ async def speak_text(request: SpeakRequest):
         processing_time = (datetime.now() - start_time).total_seconds()
 
         if result.reason == ResultReason.SynthesizingAudioCompleted:
+            pipeline_metrics.record("tts", processing_time)
             audio_base64 = AudioProcessor.pcm_to_base64(result.audio_data)
             return {
                 "audio_data": audio_base64,
@@ -385,6 +408,7 @@ async def speak_text(request: SpeakRequest):
             }
         else:
             details = getattr(result, "cancellation_details", None)
+            pipeline_metrics.record_error("tts")
             raise HTTPException(
                 status_code=500,
                 detail=f"Speech synthesis failed: {details.error_details if details else result.reason}"
@@ -400,11 +424,13 @@ async def speak_text(request: SpeakRequest):
 async def converse(request: ConverseRequest):
     """End-to-end voice conversation pipeline"""
     try:
+        pipeline_start = datetime.now()
         session_id = request.session_id or str(uuid.uuid4())
 
         # Step 1: Speech to Text
         transcribe_req = TranscribeRequest(audio_data=request.audio_data)
         transcription_result = await transcribe_audio(transcribe_req)
+        stt_done = datetime.now()
 
         # Step 2: Process with RAG
         chat_req = ChatRequest(
@@ -412,17 +438,30 @@ async def converse(request: ConverseRequest):
             session_id=session_id
         )
         chat_result = await chat(chat_req)
+        chat_done = datetime.now()
 
         # Step 3: Text to Speech
         speak_req = SpeakRequest(text=chat_result["response"])
         speech_result = await speak_text(speak_req)
+        tts_done = datetime.now()
+
+        total_seconds = (tts_done - pipeline_start).total_seconds()
+        pipeline_metrics.record("converse", total_seconds)
 
         return {
             "transcription": transcription_result["transcription"],
             "response": chat_result["response"],
             "audio_data": speech_result["audio_data"],
             "session_id": session_id,
-            "context_sources": chat_result["context_sources"]
+            "context_sources": chat_result["context_sources"],
+            # Per-stage latency breakdown so clients (and load tests) can see
+            # exactly where the round-trip budget goes.
+            "latency_seconds": {
+                "stt": round((stt_done - pipeline_start).total_seconds(), 4),
+                "chat": round((chat_done - stt_done).total_seconds(), 4),
+                "tts": round((tts_done - chat_done).total_seconds(), 4),
+                "total": round(total_seconds, 4),
+            }
         }
 
     except HTTPException:

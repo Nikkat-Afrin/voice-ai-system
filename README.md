@@ -80,6 +80,7 @@ chmod +x deploy.sh
 - `POST /reset` — clear conversation memory
 - `POST /upload_rag_docs` — upload documents for RAG indexing
 - `GET /health` — health check
+- `GET /metrics` — per-stage latency percentiles (p50/p95/p99 for STT, RAG retrieval, LLM, TTS, end-to-end) + live session stats
 
 ### WebSocket
 
@@ -120,7 +121,8 @@ AZURE_SEARCH_INDEX=rag-index
 - **State & context:** rolling conversation history per session with RAG grounding for domain answers.
 - **Resilience:** startup fails fast with a clear message if configuration is missing; recognition and synthesis results are validated (NoMatch/Canceled handled explicitly).
 - **Security:** secrets via environment variables / Azure Key Vault — never committed; `.env.example` template provided.
-- **Observability:** per-stage processing times returned in responses; Azure Monitor / Application Insights in deployment.
+- **Observability:** built-in `/metrics` endpoint with rolling-window latency percentiles (p50/p95/p99) per pipeline stage — STT, RAG retrieval, LLM, TTS, and the end-to-end round trip; `/converse` responses include a per-stage latency breakdown so clients and load tests can see exactly where the budget goes.
+- **Bounded memory:** conversation sessions live in a TTL + LRU-capped store (`session_store.py`), so a long-running server can't leak history; limits are tunable via `SESSION_TTL_SECONDS` / `SESSION_MAX_COUNT`.
 - **Scaling:** Azure Container Apps auto-scaling (1–10 instances) defined in Bicep.
 
 ## 🧪 Testing
