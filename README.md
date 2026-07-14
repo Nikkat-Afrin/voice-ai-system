@@ -1,221 +1,160 @@
-# Azure Real-Time Voice Conversational AI System
+# Azure Real-Time Voice Conversational AI System 🎙️🤖
 
-A production-ready real-time voice conversational AI system built with Azure services, FastAPI, and WebSocket support.
+**A low-latency, full-duplex voice assistant on Microsoft Azure: speech in → understanding → LLM response → speech out, streamed in real time for natural back-and-forth conversation.**
 
-## Features
+![Azure](https://img.shields.io/badge/Azure-Speech%20%7C%20OpenAI%20%7C%20AI%20Search-0078D4?logo=microsoftazure&logoColor=white) ![Python](https://img.shields.io/badge/Python-FastAPI-3776AB?logo=python&logoColor=white) ![Type](https://img.shields.io/badge/Type-Real--time%20Voice%20AI-purple) ![Status](https://img.shields.io/badge/Architecture-Production--style-green)
 
-- **Real-time Voice Conversation**: Bidirectional voice communication with WebSocket support
-- **Azure Services Integration**: Speech Services (STT/TTS), OpenAI (GPT-4o), AI Search (RAG)
-- **Scalable Architecture**: Container Apps deployment with auto-scaling
-- **Memory Retention**: Conversation history across sessions
-- **Document RAG**: Upload and query documents with vector search
-- **Production Ready**: Monitoring, logging, security, and deployment automation
+---
 
-## Architecture
+## 🧭 What it does
+
+The system holds a **spoken conversation** with a user in real time:
+
+1. **Listen** — captures microphone audio (PCM 16 kHz mono) and streams it to the backend over WebSocket.
+2. **Transcribe** — Azure AI Speech converts speech to text.
+3. **Reason** — the transcript, conversation history, and retrieved documents (RAG via Azure AI Search) are sent to Azure OpenAI (GPT-4o) to generate a context-aware, grounded reply.
+4. **Speak** — Azure neural Text-to-Speech synthesizes the reply and streams it back for playback.
+
+## 🏗️ Architecture
+
 <img width="1600" height="522" alt="image" src="https://github.com/user-attachments/assets/a9b72fcb-7ece-4b0a-b85b-88411197f89a" />
 
 ```
-Frontend (WebSocket) → FastAPI Backend → Azure Services
-                                    ├── Speech Services (STT/TTS)
-                                    ├── OpenAI (GPT-4o)
-                                    └── AI Search (RAG)
+🎤 Mic / client ──audio (WebSocket)──► FastAPI backend
+                                          │
+                                          ├─► Azure AI Speech (STT)
+                                          │        │ transcript
+                                          ▼        ▼
+                                   Conversation orchestrator ──► Azure OpenAI (GPT-4o)
+                                          │                          ▲
+                                          │            RAG context   │
+                                          │       Azure AI Search ───┘
+                                          ▼
+                                   Azure AI Speech (neural TTS)
+                                          │ synthesized audio
+                                          ▼
+                                      🔊 client playback
 ```
 
-## Quick Start
+**Core Azure services**
+- **Azure AI Speech** — Speech-to-Text and neural Text-to-Speech (en-US-AriaNeural by default).
+- **Azure OpenAI Service** — GPT-4o for response generation, text-embedding-ada-002 for embeddings.
+- **Azure AI Search** — hybrid (keyword + vector) retrieval over uploaded documents.
+- **Hosting** — FastAPI + WebSocket, containerized (Docker) and deployed to Azure Container Apps via Bicep IaC and GitHub Actions CI/CD.
+
+## ▶️ Quick Start
 
 ### Prerequisites
 
-- Azure subscription
-- Azure CLI installed
-- Docker installed
-- Python 3.12+
+- Python 3.10+
+- An Azure subscription with Speech, OpenAI, and AI Search resources
+- Azure CLI and Docker (for deployment only)
 
-### 1. Clone and Setup
+### Run locally
 
 ```bash
-git clone <repository-url>
-cd voice-ai-system
+git clone https://github.com/Nikkat-Afrin/azure-voice-conversational-ai.git
+cd azure-voice-conversational-ai
 pip install -r requirements.txt
+
+cp .env.example .env   # fill in your Azure keys/endpoints (never commit .env)
+
+python main.py         # open http://localhost:8000 and speak to the assistant
 ```
 
-### 2. Configure Environment
-
-```bash
-cp env.example .env
-# Edit .env with your Azure service keys
-```
-
-### 3. Deploy to Azure
+### Deploy to Azure
 
 ```bash
 chmod +x deploy.sh
 ./deploy.sh
 ```
 
-### 4. Run Locally
+## 📡 API Endpoints
 
-```bash
-python main.py
-```
+### REST
 
-## API Endpoints
-
-### REST API
-
-- `POST /transcribe` - Convert audio to text
-- `POST /chat` - Text conversation with RAG
-- `POST /speak` - Convert text to audio
-- `POST /converse` - End-to-end voice pipeline
-- `POST /reset` - Clear conversation memory
-- `POST /upload_rag_docs` - Upload documents for RAG
+- `POST /transcribe` — audio (base64 PCM) → text
+- `POST /chat` — text conversation with RAG context
+- `POST /speak` — text → audio (base64 WAV)
+- `POST /converse` — end-to-end voice pipeline (STT → RAG+LLM → TTS)
+- `POST /reset` — clear conversation memory
+- `POST /upload_rag_docs` — upload documents for RAG indexing
+- `GET /health` — health check
 
 ### WebSocket
 
-- `WS /ws/voice/{session_id}` - Real-time voice conversation
+- `WS /ws/voice/{session_id}` — real-time voice conversation
 
-## WebSocket Message Format
-
-### Client to Server
+**Client → server**
 
 ```json
-{
-  "type": "audio_chunk",
-  "data": "base64_encoded_pcm_audio"
-}
+{ "type": "audio_chunk", "data": "<base64 PCM 16 kHz 16-bit mono>" }
 ```
 
-### Server to Client
+**Server → client**
 
 ```json
-{
-  "type": "audio_response",
-  "audio_data": "base64_encoded_pcm_audio",
-  "text": "Generated response text",
-  "sources": ["source1", "source2"]
-}
+{ "type": "audio_response", "audio_data": "<base64 WAV>", "text": "reply", "sources": ["doc1"] }
 ```
 
-## Configuration
-
-### Environment Variables
-
-- `AZURE_SPEECH_KEY` - Azure Speech Services key
-- `AZURE_SPEECH_REGION` - Azure region
-- `AZURE_OPENAI_ENDPOINT` - OpenAI endpoint URL
-- `AZURE_OPENAI_KEY` - OpenAI API key
-- `AZURE_SEARCH_ENDPOINT` - AI Search endpoint
-- `AZURE_SEARCH_KEY` - AI Search API key
-
-### Audio Format
-
-- **Format**: PCM 16-bit mono
-- **Sample Rate**: 16kHz
-- **Encoding**: Base64 for WebSocket transmission
-
-## Production Deployment
-
-### Azure Container Apps
-
-The system is optimized for Azure Container Apps with:
-
-- **Auto-scaling**: Based on HTTP requests and WebSocket connections
-- **Health Checks**: Automated health monitoring
-- **Logging**: Integrated with Azure Monitor
-- **Security**: Managed identity and secure secrets
-
-### Monitoring
-
-- **Application Insights**: Performance and error tracking
-- **Log Analytics**: Centralized logging
-- **Health Checks**: Automated endpoint monitoring
-
-## Testing
+## 🔐 Configuration
 
 ```bash
-# Run unit tests
-pytest tests/
-
-# Run integration tests
-pytest tests/integration/
-
-# Run with coverage
-pytest --cov=main tests/
+# .env.example — copy to .env and fill in (do NOT commit real keys)
+AZURE_SPEECH_KEY=...
+AZURE_SPEECH_REGION=eastus
+AZURE_OPENAI_ENDPOINT=...
+AZURE_OPENAI_KEY=...
+AZURE_OPENAI_DEPLOYMENT=gpt-4o
+AZURE_OPENAI_EMBEDDING_DEPLOYMENT=text-embedding-ada-002
+AZURE_SEARCH_ENDPOINT=...
+AZURE_SEARCH_KEY=...
+AZURE_SEARCH_INDEX=rag-index
 ```
 
-## Security
+**Audio format:** PCM, 16-bit, mono, 16 kHz, base64-encoded for transport.
 
-- **Authentication**: Azure AD integration
-- **Secrets Management**: Azure Key Vault
-- **Network Security**: Private endpoints and VNet integration
-- **Data Protection**: Encryption in transit and at rest
+## ⚙️ Production-style design considerations
 
-## Performance
+- **Non-blocking pipeline:** all Azure SDK calls (STT, TTS, OpenAI, Search) run off the event loop (`asyncio.to_thread`) so concurrent WebSocket sessions don't stall each other.
+- **State & context:** rolling conversation history per session with RAG grounding for domain answers.
+- **Resilience:** startup fails fast with a clear message if configuration is missing; recognition and synthesis results are validated (NoMatch/Canceled handled explicitly).
+- **Security:** secrets via environment variables / Azure Key Vault — never committed; `.env.example` template provided.
+- **Observability:** per-stage processing times returned in responses; Azure Monitor / Application Insights in deployment.
+- **Scaling:** Azure Container Apps auto-scaling (1–10 instances) defined in Bicep.
 
-- **Latency**: Sub-200ms end-to-end response time
-- **Concurrency**: Supports 1000+ concurrent WebSocket connections
-- **Throughput**: 100+ requests per second per instance
-- **Scaling**: Auto-scales from 1 to 10 instances
-
-## Troubleshooting
-
-### Common Issues
-
-1. **WebSocket Connection Failed**
-   - Check network connectivity
-   - Verify SSL certificates
-   - Confirm WebSocket support in load balancer
-
-2. **Azure Service Authentication**
-   - Verify managed identity configuration
-   - Check API key validity
-   - Confirm service region settings
-
-3. **Audio Processing Issues**
-   - Validate audio format (PCM 16kHz mono)
-   - Check base64 encoding
-   - Verify GStreamer installation
-
-### Logs
+## 🧪 Testing
 
 ```bash
-# View application logs
-az containerapp logs show --name voice-ai-app --resource-group voice-ai-rg
-
-# Monitor real-time logs
-az containerapp logs tail --name voice-ai-app --resource-group voice-ai-rg
+pytest tests/                 # unit tests
+pytest tests/integration/     # integration tests
+pytest --cov=main tests/      # coverage
+python test_system.py         # live system test against a running server
 ```
 
-## Project Structure
+## 📁 Project Structure
 
 ```
-voice-ai-system/
-├── main.py                    # Main FastAPI application
-├── requirements.txt           # Python dependencies
-├── Dockerfile                # Multi-stage container build
-├── env.example               # Environment template
+azure-voice-conversational-ai/
+├── main.py                   # FastAPI application (STT, RAG, TTS, WebSocket)
+├── frontend/index.html       # Browser test client (PCM capture + playback)
+├── requirements.txt          # Python dependencies
+├── .env.example              # Environment template
+├── Dockerfile                # Container build
 ├── deploy.sh                 # Azure deployment script
-├── README.md                 # Documentation
-├── .github/
-│   └── workflows/
-│       └── deploy.yml        # CI/CD pipeline
-├── bicep/
-│   └── main.bicep           # Infrastructure as Code
-├── tests/
-│   ├── __init__.py
-│   ├── test_main.py         # Unit tests
-│   └── integration/
-│       └── test_integration.py
-└── scripts/
-    └── post-deploy.sh       # Post-deployment configuration
+├── bicep/main.bicep          # Infrastructure as Code
+├── .github/workflows/        # CI/CD pipeline
+├── tests/                    # Unit + integration tests
+└── scripts/                  # Setup and post-deploy scripts
 ```
 
-## Contributing
+## 🚀 Possible extensions
 
-1. Fork the repository
-2. Create a feature branch
-3. Make changes with tests
-4. Submit pull request
+- Streaming (continuous) recognition with interim results and barge-in during playback.
+- Token-streaming from the LLM with chunked TTS to cut time-to-first-audio.
+- Voice-activity detection for cleaner endpointing; multilingual STT/TTS.
+- Redis-backed session storage for horizontal scaling.
 
 ## License
 
-MIT License - see LICENSE file for details 
+MIT License

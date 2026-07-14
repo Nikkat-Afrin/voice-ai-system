@@ -173,10 +173,14 @@
 
     <script>
         let websocket;
-        let mediaRecorder;
-        let audioChunks = [];
+        let audioContext;
+        let micStream;
+        let processorNode;
+        let pcmChunks = [];
         let isRecording = false;
         let sessionId = null;
+
+        const TARGET_SAMPLE_RATE = 16000;
 
         function log(message) {
             const logElement = document.getElementById('log');
@@ -332,37 +336,30 @@
             }
         }
 
+        // Capture raw PCM (16 kHz, 16-bit, mono) — the format the server's
+        // Azure Speech push stream expects. MediaRecorder is NOT used because
+        // it produces compressed webm/opus, which Azure can't decode as PCM.
         function startRecording() {
-            navigator.mediaDevices.getUserMedia({ audio: true })
+            navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, sampleRate: TARGET_SAMPLE_RATE } })
                 .then(stream => {
-                    mediaRecorder = new MediaRecorder(stream);
-                    
-                    mediaRecorder.ondataavailable = function(event) {
-                        audioChunks.push(event.data);
+                    micStream = stream;
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: TARGET_SAMPLE_RATE });
+                    const source = audioContext.createMediaStreamSource(stream);
+                    processorNode = audioContext.createScriptProcessor(4096, 1, 1);
+                    pcmChunks = [];
+
+                    processorNode.onaudioprocess = function(event) {
+                        // Copy the Float32 samples (the buffer is reused by the browser)
+                        pcmChunks.push(new Float32Array(event.inputBuffer.getChannelData(0)));
                     };
-                    
-                    mediaRecorder.onstop = function() {
-                        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-                        const reader = new FileReader();
-                        reader.onload = function(e) {
-                            const base64Audio = btoa(e.target.result);
-                            if (websocket && websocket.readyState === WebSocket.OPEN) {
-                                websocket.send(JSON.stringify({
-                                    type: 'audio_chunk',
-                                    data: base64Audio
-                                }));
-                                log('Sent audio chunk');
-                            }
-                        };
-                        reader.readAsBinaryString(audioBlob);
-                        audioChunks = [];
-                    };
-                    
-                    mediaRecorder.start();
+
+                    source.connect(processorNode);
+                    processorNode.connect(audioContext.destination);
+
                     isRecording = true;
                     document.getElementById('recordBtn').textContent = 'Stop Recording';
                     document.getElementById('recordBtn').className = 'btn-danger';
-                    log('Started recording');
+                    log(`Started recording (PCM ${audioContext.sampleRate} Hz)`);
                 })
                 .catch(error => {
                     log(`Recording error: ${error.message}`);
@@ -370,15 +367,61 @@
                 });
         }
 
-        function stopRecording() {
-            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-                mediaRecorder.stop();
-                mediaRecorder.stream.getTracks().forEach(track => track.stop());
-                isRecording = false;
-                document.getElementById('recordBtn').textContent = 'Start Recording';
-                document.getElementById('recordBtn').className = 'btn-success';
-                log('Stopped recording');
+        function floatTo16BitPCM(float32Arrays) {
+            const totalLength = float32Arrays.reduce((sum, a) => sum + a.length, 0);
+            const pcm16 = new Int16Array(totalLength);
+            let offset = 0;
+            for (const chunk of float32Arrays) {
+                for (let i = 0; i < chunk.length; i++) {
+                    const s = Math.max(-1, Math.min(1, chunk[i]));
+                    pcm16[offset++] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+                }
             }
+            return pcm16;
+        }
+
+        function arrayBufferToBase64(buffer) {
+            const bytes = new Uint8Array(buffer);
+            let binary = '';
+            const chunkSize = 0x8000; // avoid call-stack limits on large buffers
+            for (let i = 0; i < bytes.length; i += chunkSize) {
+                binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+            }
+            return btoa(binary);
+        }
+
+        function stopRecording() {
+            if (!isRecording) return;
+
+            if (processorNode) {
+                processorNode.disconnect();
+                processorNode = null;
+            }
+            if (micStream) {
+                micStream.getTracks().forEach(track => track.stop());
+                micStream = null;
+            }
+            if (audioContext) {
+                audioContext.close();
+                audioContext = null;
+            }
+
+            const pcm16 = floatTo16BitPCM(pcmChunks);
+            pcmChunks = [];
+
+            if (pcm16.length > 0 && websocket && websocket.readyState === WebSocket.OPEN) {
+                const base64Audio = arrayBufferToBase64(pcm16.buffer);
+                websocket.send(JSON.stringify({
+                    type: 'audio_chunk',
+                    data: base64Audio
+                }));
+                log(`Sent audio chunk (${pcm16.length} samples)`);
+            }
+
+            isRecording = false;
+            document.getElementById('recordBtn').textContent = 'Start Recording';
+            document.getElementById('recordBtn').className = 'btn-success';
+            log('Stopped recording');
         }
 
         function toggleRecording() {
