@@ -2,7 +2,7 @@
 
 **A low-latency, full-duplex voice assistant on Microsoft Azure: speech in → understanding → LLM response → speech out, streamed in real time for natural back-and-forth conversation.**
 
-![Azure](https://img.shields.io/badge/Azure-Speech%20%7C%20OpenAI%20%7C%20AI%20Search-0078D4?logo=microsoftazure&logoColor=white) ![Python](https://img.shields.io/badge/Python-FastAPI-3776AB?logo=python&logoColor=white) ![Type](https://img.shields.io/badge/Type-Real--time%20Voice%20AI-purple) ![Status](https://img.shields.io/badge/Architecture-Production--style-green)
+[![CI](https://github.com/Nikkat-Afrin/voice-ai-system/actions/workflows/ci.yml/badge.svg)](https://github.com/Nikkat-Afrin/voice-ai-system/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) ![Azure](https://img.shields.io/badge/Azure-Speech%20%7C%20OpenAI%20%7C%20AI%20Search-0078D4?logo=microsoftazure&logoColor=white) ![Python](https://img.shields.io/badge/Python-FastAPI-3776AB?logo=python&logoColor=white) ![Type](https://img.shields.io/badge/Type-Real--time%20Voice%20AI-purple) ![Status](https://img.shields.io/badge/Architecture-Production--style-green)
 
 ---
 
@@ -150,11 +150,4 @@ azure-voice-conversational-ai/
 
 ## 🚀 Possible extensions
 
-- Streaming (continuous) recognition with interim results and barge-in during playback.
-- Token-streaming from the LLM with chunked TTS to cut time-to-first-audio.
-- Voice-activity detection for cleaner endpointing; multilingual STT/TTS.
-- Redis-backed session storage for horizontal scaling.
-
-## License
-
-MIT License
+- Streaming (continuous) recognition with interim results and barge-in during pl
