@@ -46,7 +46,7 @@ The system holds a **spoken conversation** with a user in real time:
 
 <img src="docs/screenshots/demo_conversation.gif" width="100%" alt="Demo conversation">
 
-Real conversation in **offline demo mode** - the assistant answers questions about its own architecture, replies are spoken with a locally-running neural TTS (Piper), and every bubble shows the measured chat + voice latency.
+A real voice-style session in **offline demo mode**: the orb pulses red while the user speaks, the transcript lands as a chat bubble, then the assistant answers - the orb switches to a speaking waveform while the reply text appears and is spoken aloud by a locally-running neural TTS (Piper). Every bubble shows the measured chat + voice latency.
 
 | | |
 |---|---|

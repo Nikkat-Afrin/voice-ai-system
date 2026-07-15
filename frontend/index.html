@@ -53,6 +53,45 @@
   #mic.rec { background: #c0392b; animation: pulse 1s infinite; }
   @keyframes pulse { 50% { transform: scale(1.08); } }
   .hint { text-align: center; font-size: 11.5px; color: var(--muted); margin-top: 10px; }
+
+  /* ---- voice stage ---- */
+  #stage { display: flex; flex-direction: column; align-items: center; gap: 10px;
+           padding: 26px 0 8px; }
+  #orbwrap { position: relative; width: 108px; height: 108px; display: grid;
+             place-items: center; }
+  .ring { position: absolute; inset: 0; border-radius: 50%; border: 2px solid var(--accent);
+          opacity: 0; }
+  #orb { width: 84px; height: 84px; border-radius: 50%; display: grid; place-items: center;
+         background: radial-gradient(circle at 32% 30%, #6ea2ff, #4f8cff 45%, #7c5cff);
+         box-shadow: 0 0 34px rgba(79,140,255,.45); transition: transform .25s; }
+  #orb svg { width: 34px; height: 34px; }
+  #bars { display: none; align-items: flex-end; gap: 4px; height: 34px; }
+  #bars i { width: 5px; border-radius: 3px; background: white; display: block;
+            animation: bar 0.9s ease-in-out infinite; }
+  #bars i:nth-child(1) { height: 40%; animation-delay: 0s; }
+  #bars i:nth-child(2) { height: 90%; animation-delay: .15s; }
+  #bars i:nth-child(3) { height: 60%; animation-delay: .3s; }
+  #bars i:nth-child(4) { height: 100%; animation-delay: .45s; }
+  #bars i:nth-child(5) { height: 50%; animation-delay: .6s; }
+  @keyframes bar { 0%,100% { transform: scaleY(.35) } 50% { transform: scaleY(1) } }
+  #state { font-size: 13px; color: var(--muted); letter-spacing: .4px; min-height: 18px; }
+
+  /* listening: expanding rings + red-shift */
+  .listening #orb { background: radial-gradient(circle at 32% 30%, #ff8f8f, #ff5a5a 45%, #c0392b);
+                    box-shadow: 0 0 40px rgba(255,90,90,.5); transform: scale(1.06); }
+  .listening .ring { animation: ripple 1.6s ease-out infinite; border-color: #ff7b7b; }
+  .listening .ring:nth-child(2) { animation-delay: .5s; }
+  .listening .ring:nth-child(3) { animation-delay: 1s; }
+  @keyframes ripple { 0% { transform: scale(.8); opacity: .8; } 100% { transform: scale(1.7); opacity: 0; } }
+
+  /* thinking: slow breathing */
+  .thinking #orb { animation: breathe 1.4s ease-in-out infinite; }
+  @keyframes breathe { 0%,100% { transform: scale(1) } 50% { transform: scale(.92) } }
+
+  /* speaking: waveform bars replace the mic glyph */
+  .speaking #orb { transform: scale(1.04); }
+  .speaking #bars { display: flex; }
+  .speaking #micglyph { display: none; }
 </style>
 </head>
 <body>
@@ -64,6 +103,17 @@
   </div>
   <div class="pill" id="mode">…</div>
 </header>
+
+<div id="stage">
+  <div id="orbwrap">
+    <div class="ring"></div><div class="ring"></div><div class="ring"></div>
+    <div id="orb">
+      <span id="micglyph"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/></svg></span>
+      <span id="bars"><i></i><i></i><i></i><i></i><i></i></span>
+    </div>
+  </div>
+  <div id="state">tap the mic or type to start</div>
+</div>
 
 <div id="chat"></div>
 
@@ -78,6 +128,23 @@
 
 <script>
 const chat = document.getElementById("chat");
+const stage = document.getElementById("stage");
+const stateLabel = document.getElementById("state");
+const STATE_TEXT = { idle: "", listening: "Listening…", thinking: "Thinking…",
+                     speaking: "Speaking…" };
+function setVoiceState(s) {
+  stage.classList.remove("listening", "thinking", "speaking");
+  if (s !== "idle") stage.classList.add(s);
+  stateLabel.textContent = STATE_TEXT[s] ?? "";
+}
+window.setVoiceState = setVoiceState;
+function playReply(b64) {
+  const audio = new Audio("data:audio/wav;base64," + b64);
+  setVoiceState("speaking");
+  audio.addEventListener("ended", () => setVoiceState("idle"));
+  audio.play().catch(() => setVoiceState("idle"));
+  return audio;
+}
 const box = document.getElementById("box");
 const modePill = document.getElementById("mode");
 const hint = document.getElementById("hint");
@@ -117,7 +184,7 @@ function hideTyping() { if (typingRow) { typingRow.parentElement.remove(); typin
 
 async function send() {
   const text = box.value.trim(); if (!text) return;
-  box.value = ""; addUser(text); showTyping();
+  box.value = ""; addUser(text); showTyping(); setVoiceState("thinking");
   const t0 = performance.now();
   try {
     const chatRes = await fetch("/chat", { method: "POST",
@@ -132,10 +199,11 @@ async function send() {
     const meta = `chat ${(tChat - t0).toFixed(0)} ms · voice ${(tAll - tChat).toFixed(0)} ms` +
                  ` · <span class="speak" title="Replay audio">&#9654; replay</span>`;
     const div = addBot(chatRes.response, meta);
-    const audio = new Audio("data:audio/wav;base64," + speakRes.audio_data);
-    audio.play().catch(() => {});
-    div.querySelector(".speak").onclick = () => audio.play();
-  } catch (e) { hideTyping(); addBot("Error: " + e.message); }
+    const audio = playReply(speakRes.audio_data);
+    div.querySelector(".speak").onclick = () => { setVoiceState("speaking");
+      audio.currentTime = 0; audio.play();
+      audio.addEventListener("ended", () => setVoiceState("idle"), { once: true }); };
+  } catch (e) { hideTyping(); setVoiceState("idle"); addBot("Error: " + e.message); }
 }
 document.getElementById("send").onclick = send;
 box.addEventListener("keydown", e => { if (e.key === "Enter") send(); });
@@ -160,6 +228,7 @@ async function startRec() {
   };
   src.connect(processor); processor.connect(audioCtx.destination);
   micBtn.classList.add("rec");
+  setVoiceState("listening");
 }
 async function stopRec() {
   if (!mediaStream) return;
@@ -169,7 +238,7 @@ async function stopRec() {
   const pcm = new Int16Array(total); let off = 0;
   chunks.forEach(c => { pcm.set(c, off); off += c.length; });
   const b64 = btoa(String.fromCharCode(...new Uint8Array(pcm.buffer)));
-  showTyping();
+  showTyping(); setVoiceState("thinking");
   const res = await fetch("/converse", { method: "POST",
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify({ audio_data: b64, session_id: sessionId }) }).then(r => r.json());
@@ -178,7 +247,7 @@ async function stopRec() {
   const lat = res.latency_seconds;
   const meta = lat ? `stt ${(lat.stt*1000).toFixed(0)} ms · chat ${(lat.chat*1000).toFixed(0)} ms · voice ${(lat.tts*1000).toFixed(0)} ms` : "";
   addBot(res.response, meta);
-  new Audio("data:audio/wav;base64," + res.audio_data).play().catch(() => {});
+  playReply(res.audio_data);
   mediaStream = null;
 }
 </script>
