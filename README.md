@@ -56,7 +56,7 @@ A real voice-style session in **offline demo mode**: the orb pulses red while th
 
 ```bash
 pip install -r requirements.txt
-DEMO_MODE=1 python main.py          # open http://localhost:8000
+DEMO_MODE=1 python main.py          # open http://localhost:8000  (add ?voice=1 for the voice-only view)
 
 # optional: real neural TTS in the demo
 pip install piper-tts

@@ -129,6 +129,10 @@
 <script>
 const chat = document.getElementById("chat");
 const stage = document.getElementById("stage");
+// Voice-only presentation mode (?voice=1): hide the typing bar - the orb is the interface
+if (new URLSearchParams(location.search).get("voice") === "1") {
+  document.querySelector("footer").style.display = "none";
+}
 const stateLabel = document.getElementById("state");
 const STATE_TEXT = { idle: "", listening: "Listening…", thinking: "Thinking…",
                      speaking: "Speaking…" };
