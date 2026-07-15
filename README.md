@@ -10,10 +10,10 @@
 
 The system holds a **spoken conversation** with a user in real time:
 
-1. **Listen** — captures microphone audio (PCM 16 kHz mono) and streams it to the backend over WebSocket.
-2. **Transcribe** — Azure AI Speech converts speech to text.
-3. **Reason** — the transcript, conversation history, and retrieved documents (RAG via Azure AI Search) are sent to Azure OpenAI (GPT-4o) to generate a context-aware, grounded reply.
-4. **Speak** — Azure neural Text-to-Speech synthesizes the reply and streams it back for playback.
+1. **Listen** - captures microphone audio (PCM 16 kHz mono) and streams it to the backend over WebSocket.
+2. **Transcribe** - Azure AI Speech converts speech to text.
+3. **Reason** - the transcript, conversation history, and retrieved documents (RAG via Azure AI Search) are sent to Azure OpenAI (GPT-4o) to generate a context-aware, grounded reply.
+4. **Speak** - Azure neural Text-to-Speech synthesizes the reply and streams it back for playback.
 
 ## 🏗️ Architecture
 
@@ -37,10 +37,10 @@ The system holds a **spoken conversation** with a user in real time:
 ```
 
 **Core Azure services**
-- **Azure AI Speech** — Speech-to-Text and neural Text-to-Speech (en-US-AriaNeural by default).
-- **Azure OpenAI Service** — GPT-4o for response generation, text-embedding-ada-002 for embeddings.
-- **Azure AI Search** — hybrid (keyword + vector) retrieval over uploaded documents.
-- **Hosting** — FastAPI + WebSocket, containerized (Docker) and deployed to Azure Container Apps via Bicep IaC and GitHub Actions CI/CD.
+- **Azure AI Speech** - Speech-to-Text and neural Text-to-Speech (en-US-AriaNeural by default).
+- **Azure OpenAI Service** - GPT-4o for response generation, text-embedding-ada-002 for embeddings.
+- **Azure AI Search** - hybrid (keyword + vector) retrieval over uploaded documents.
+- **Hosting** - FastAPI + WebSocket, containerized (Docker) and deployed to Azure Container Apps via Bicep IaC and GitHub Actions CI/CD.
 
 ## ▶️ Quick Start
 
@@ -73,18 +73,18 @@ chmod +x deploy.sh
 
 ### REST
 
-- `POST /transcribe` — audio (base64 PCM) → text
-- `POST /chat` — text conversation with RAG context
-- `POST /speak` — text → audio (base64 WAV)
-- `POST /converse` — end-to-end voice pipeline (STT → RAG+LLM → TTS)
-- `POST /reset` — clear conversation memory
-- `POST /upload_rag_docs` — upload documents for RAG indexing
-- `GET /health` — health check
-- `GET /metrics` — per-stage latency percentiles (p50/p95/p99 for STT, RAG retrieval, LLM, TTS, end-to-end) + live session stats
+- `POST /transcribe` - audio (base64 PCM) → text
+- `POST /chat` - text conversation with RAG context
+- `POST /speak` - text → audio (base64 WAV)
+- `POST /converse` - end-to-end voice pipeline (STT → RAG+LLM → TTS)
+- `POST /reset` - clear conversation memory
+- `POST /upload_rag_docs` - upload documents for RAG indexing
+- `GET /health` - health check
+- `GET /metrics` - per-stage latency percentiles (p50/p95/p99 for STT, RAG retrieval, LLM, TTS, end-to-end) + live session stats
 
 ### WebSocket
 
-- `WS /ws/voice/{session_id}` — real-time voice conversation
+- `WS /ws/voice/{session_id}` - real-time voice conversation
 
 **Client → server**
 
@@ -101,7 +101,7 @@ chmod +x deploy.sh
 ## 🔐 Configuration
 
 ```bash
-# .env.example — copy to .env and fill in (do NOT commit real keys)
+# .env.example - copy to .env and fill in (do NOT commit real keys)
 AZURE_SPEECH_KEY=...
 AZURE_SPEECH_REGION=eastus
 AZURE_OPENAI_ENDPOINT=...
@@ -120,10 +120,10 @@ AZURE_SEARCH_INDEX=rag-index
 - **Non-blocking pipeline:** all Azure SDK calls (STT, TTS, OpenAI, Search) run off the event loop (`asyncio.to_thread`) so concurrent WebSocket sessions don't stall each other.
 - **State & context:** rolling conversation history per session with RAG grounding for domain answers.
 - **Resilience:** startup fails fast with a clear message if configuration is missing; recognition and synthesis results are validated (NoMatch/Canceled handled explicitly).
-- **Security:** secrets via environment variables / Azure Key Vault — never committed; `.env.example` template provided.
-- **Observability:** built-in `/metrics` endpoint with rolling-window latency percentiles (p50/p95/p99) per pipeline stage — STT, RAG retrieval, LLM, TTS, and the end-to-end round trip; `/converse` responses include a per-stage latency breakdown so clients and load tests can see exactly where the budget goes.
+- **Security:** secrets via environment variables / Azure Key Vault - never committed; `.env.example` template provided.
+- **Observability:** built-in `/metrics` endpoint with rolling-window latency percentiles (p50/p95/p99) per pipeline stage - STT, RAG retrieval, LLM, TTS, and the end-to-end round trip; `/converse` responses include a per-stage latency breakdown so clients and load tests can see exactly where the budget goes.
 - **Bounded memory:** conversation sessions live in a TTL + LRU-capped store (`session_store.py`), so a long-running server can't leak history; limits are tunable via `SESSION_TTL_SECONDS` / `SESSION_MAX_COUNT`.
-- **Scaling:** Azure Container Apps auto-scaling (1–10 instances) defined in Bicep.
+- **Scaling:** Azure Container Apps auto-scaling (1-10 instances) defined in Bicep.
 
 ## 🧪 Testing
 

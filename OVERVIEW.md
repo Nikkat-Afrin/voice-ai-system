@@ -9,10 +9,10 @@
 
 ## 🧭 What it does
 The system holds a **spoken conversation** with a user in real time:
-1. **Listen** — captures microphone audio and streams it to speech recognition.
-2. **Transcribe** — converts speech to text continuously (interim + final results) so the assistant can respond the moment the user stops talking.
-3. **Reason** — sends the transcript (plus conversation history) to a large language model to generate a context-aware reply.
-4. **Speak** — synthesizes the reply to natural speech and streams it back, enabling barge-in / low-latency turn-taking.
+1. **Listen** - captures microphone audio and streams it to speech recognition.
+2. **Transcribe** - converts speech to text continuously (interim + final results) so the assistant can respond the moment the user stops talking.
+3. **Reason** - sends the transcript (plus conversation history) to a large language model to generate a context-aware reply.
+4. **Speak** - synthesizes the reply to natural speech and streams it back, enabling barge-in / low-latency turn-taking.
 
 ## 🏗️ Architecture
 
@@ -30,21 +30,21 @@ The system holds a **spoken conversation** with a user in real time:
 ```
 
 **Core Azure services**
-- **Azure AI Speech** — streaming Speech-to-Text and neural Text-to-Speech (SSML for prosody/voice control).
-- **Azure OpenAI Service** — the conversational LLM (`‹confirm model, e.g. gpt-4o / gpt-4o-mini›`) for response generation.
-- **Orchestration / hosting** — `‹confirm: Python service, FastAPI/Flask, WebSocket, Azure App Service / Functions / Container Apps›`.
+- **Azure AI Speech** - streaming Speech-to-Text and neural Text-to-Speech (SSML for prosody/voice control).
+- **Azure OpenAI Service** - the conversational LLM (`‹confirm model, e.g. gpt-4o / gpt-4o-mini›`) for response generation.
+- **Orchestration / hosting** - `‹confirm: Python service, FastAPI/Flask, WebSocket, Azure App Service / Functions / Container Apps›`.
 
 ## ⚙️ Production-style design considerations
 - **Latency budget:** streaming STT + token-streaming from the LLM + chunked TTS to minimize time-to-first-audio (target sub-second perceived response).
 - **Turn-taking & barge-in:** endpointing on STT finals; allow the user to interrupt playback.
 - **State & context:** rolling conversation history with a token budget; optional retrieval (RAG) for grounded answers `‹if implemented›`.
 - **Resilience:** retries/back-off on service calls, graceful degradation if a service is unavailable.
-- **Security:** secrets (Speech key, Azure OpenAI key/endpoint) via environment variables / Azure Key Vault — **never committed**. Use a `.env.example` template.
+- **Security:** secrets (Speech key, Azure OpenAI key/endpoint) via environment variables / Azure Key Vault - **never committed**. Use a `.env.example` template.
 - **Observability:** log latency per stage (STT, LLM, TTS) to find bottlenecks.
 
 ## 🔐 Configuration (example)
 ```bash
-# .env.example — copy to .env and fill in (do NOT commit real keys)
+# .env.example - copy to .env and fill in (do NOT commit real keys)
 AZURE_SPEECH_KEY=...
 AZURE_SPEECH_REGION=...
 AZURE_OPENAI_ENDPOINT=...
@@ -52,7 +52,7 @@ AZURE_OPENAI_KEY=...
 AZURE_OPENAI_DEPLOYMENT=...   # e.g. gpt-4o
 ```
 
-## ▶️ Run (summary — reconcile with repo)
+## ▶️ Run (summary - reconcile with repo)
 ```bash
 pip install -r requirements.txt      # ‹confirm›
 cp .env.example .env                 # add your Azure credentials
