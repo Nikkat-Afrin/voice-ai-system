@@ -57,7 +57,7 @@
   /* ---- voice stage ---- */
   #stage { display: flex; flex-direction: column; align-items: center; gap: 10px;
            padding: 26px 0 8px; }
-  #orbwrap { position: relative; width: 108px; height: 108px; display: grid;
+  #orbwrap { cursor: pointer; position: relative; width: 108px; height: 108px; display: grid;
              place-items: center; }
   .ring { position: absolute; inset: 0; border-radius: 50%; border: 2px solid var(--accent);
           opacity: 0; }
@@ -129,10 +129,10 @@
 <script>
 const chat = document.getElementById("chat");
 const stage = document.getElementById("stage");
-// Voice-only presentation mode (?voice=1): hide the typing bar - the orb is the interface
-if (new URLSearchParams(location.search).get("voice") === "1") {
-  document.querySelector("footer").style.display = "none";
-}
+// Voice-first by default: the orb is the interface. Typing is an opt-in
+// fallback (?text=1) for environments without audio.
+const TEXT_MODE = new URLSearchParams(location.search).get("text") === "1";
+if (!TEXT_MODE) document.querySelector("footer").style.display = "none";
 const stateLabel = document.getElementById("state");
 const STATE_TEXT = { idle: "", listening: "Listening…", thinking: "Thinking…",
                      speaking: "Speaking…" };
@@ -160,11 +160,40 @@ fetch("/health").then(r => r.json()).then(h => {
   modePill.textContent = demo ? "● demo mode - fully local" : "● live - Azure";
   modePill.classList.toggle("live", !demo);
   hint.textContent = demo
-    ? "Demo mode: rule-based assistant + local neural TTS (Piper). No cloud calls. Mic needs live mode."
+    ? "Demo mode: rule-based assistant + local neural TTS (Piper). No cloud calls."
     : "Live mode: Azure Speech STT/TTS + GPT-4o with RAG.";
-  addBot("Hi! Ask me about this system's architecture, latency budget, RAG grounding, or tech stack." +
+  stateLabel.textContent = demo ? "tap the orb to talk" : "hold the orb to talk";
+  addBot("Hi! Tap the orb and ask me about this system's architecture, latency budget, RAG grounding, or tech stack." +
          (demo ? " (I'm running fully offline right now.)" : ""));
 });
+
+// --- demo: tapping the orb plays a spoken conversation turn ---------------
+const DEMO_QUESTIONS = [
+  "Hey, what can you do?",
+  "How does the whole pipeline work?",
+  "And how fast is it?",
+  "What grounds your answers?",
+  "Is this costing anything right now?",
+];
+let demoTurnIndex = 0;
+let demoBusy = false;
+async function demoTurn() {
+  if (demoBusy) return;
+  demoBusy = true;
+  setVoiceState("listening");
+  await new Promise(r => setTimeout(r, 1300));   // "user speaking"
+  const q = DEMO_QUESTIONS[demoTurnIndex++ % DEMO_QUESTIONS.length];
+  box.value = q;
+  await send();                                   // transcript lands, reply spoken
+  demoBusy = false;
+}
+document.getElementById("orbwrap").addEventListener("mousedown", () => {
+  if (demo) { demoTurn(); } else { startRec(); }
+});
+document.getElementById("orbwrap").addEventListener("mouseup", () => {
+  if (!demo) stopRec();
+});
+window.demoTurn = demoTurn;
 
 function addRow(cls, html) {
   const row = document.createElement("div"); row.className = "row";

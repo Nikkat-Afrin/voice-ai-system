@@ -44,19 +44,19 @@ The system holds a **spoken conversation** with a user in real time:
 
 ## 🖥️ See it in action
 
-<img src="docs/screenshots/demo_conversation.gif" width="100%" alt="Demo conversation">
+<img src="docs/screenshots/voice_conversation.gif" width="100%" alt="Voice conversation demo">
 
-A real voice-style session in **offline demo mode**: the orb pulses red while the user speaks, the transcript lands as a chat bubble, then the assistant answers - the orb switches to a speaking waveform while the reply text appears and is spoken aloud by a locally-running neural TTS (Piper). Every bubble shows the measured chat + voice latency.
+The interface is **voice-first: the orb is the whole UI**. Tap it to talk - it pulses red while listening, the transcript lands as a bubble, and the orb switches to a speaking waveform while the reply text appears and is spoken aloud by a locally-running neural TTS (Piper). Every bubble shows the measured chat + voice latency. (A typing fallback exists behind `?text=1` for environments without audio.)
 
 | | |
 |---|---|
-| ![Conversation](docs/screenshots/demo_conversation.png) | ![Full session](docs/screenshots/demo_full_session.png) |
+| ![Listening](docs/screenshots/voice_listening.png) | ![Session](docs/screenshots/voice_session.png) |
 
 ### Try it without an Azure account
 
 ```bash
 pip install -r requirements.txt
-DEMO_MODE=1 python main.py          # open http://localhost:8000  (add ?voice=1 for the voice-only view)
+DEMO_MODE=1 python main.py          # open http://localhost:8000 and tap the orb  (?text=1 adds a typing fallback)
 
 # optional: real neural TTS in the demo
 pip install piper-tts
@@ -64,7 +64,7 @@ python -m piper.download_voices en_US-lessac-low --data-dir voices
 DEMO_MODE=1 PIPER_VOICE=voices/en_US-lessac-low.onnx python main.py
 ```
 
-Demo mode makes **zero cloud calls**: chat is a rule-based assistant that explains the system, speech synthesis is local Piper TTS, and cloud STT is disabled (the UI falls back to the text box).
+Demo mode makes **zero cloud calls**: tapping the orb plays a guided spoken conversation (cloud STT is disabled offline), the assistant is rule-based and explains the system, and speech synthesis is local Piper TTS. In live Azure mode the orb is real push-to-talk.
 
 ## ▶️ Quick Start
 
