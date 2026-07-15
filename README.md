@@ -42,6 +42,30 @@ The system holds a **spoken conversation** with a user in real time:
 - **Azure AI Search** - hybrid (keyword + vector) retrieval over uploaded documents.
 - **Hosting** - FastAPI + WebSocket, containerized (Docker) and deployed to Azure Container Apps via Bicep IaC and GitHub Actions CI/CD.
 
+## 🖥️ See it in action
+
+<img src="docs/screenshots/demo_conversation.gif" width="100%" alt="Demo conversation">
+
+Real conversation in **offline demo mode** - the assistant answers questions about its own architecture, replies are spoken with a locally-running neural TTS (Piper), and every bubble shows the measured chat + voice latency.
+
+| | |
+|---|---|
+| ![Conversation](docs/screenshots/demo_conversation.png) | ![Full session](docs/screenshots/demo_full_session.png) |
+
+### Try it without an Azure account
+
+```bash
+pip install -r requirements.txt
+DEMO_MODE=1 python main.py          # open http://localhost:8000
+
+# optional: real neural TTS in the demo
+pip install piper-tts
+python -m piper.download_voices en_US-lessac-low --data-dir voices
+DEMO_MODE=1 PIPER_VOICE=voices/en_US-lessac-low.onnx python main.py
+```
+
+Demo mode makes **zero cloud calls**: chat is a rule-based assistant that explains the system, speech synthesis is local Piper TTS, and cloud STT is disabled (the UI falls back to the text box).
+
 ## ▶️ Quick Start
 
 ### Prerequisites

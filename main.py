@@ -22,6 +22,7 @@ from azure.search.documents.models import VectorizedQuery
 from azure.core.credentials import AzureKeyCredential
 from dotenv import load_dotenv
 
+from demo import demo_reply, demo_tts
 from metrics import pipeline_metrics
 from session_store import SessionStore
 
@@ -43,6 +44,9 @@ AZURE_SEARCH_ENDPOINT = os.getenv("AZURE_SEARCH_ENDPOINT")
 AZURE_SEARCH_KEY = os.getenv("AZURE_SEARCH_KEY")
 AZURE_SEARCH_INDEX = os.getenv("AZURE_SEARCH_INDEX", "rag-index")
 
+# Offline demo mode: run the whole app locally with no Azure account
+DEMO_MODE = os.getenv("DEMO_MODE", "0") == "1"
+
 # Fail fast with a clear message if required configuration is missing
 _REQUIRED_ENV = {
     "AZURE_SPEECH_KEY": AZURE_SPEECH_KEY,
@@ -52,11 +56,21 @@ _REQUIRED_ENV = {
     "AZURE_SEARCH_KEY": AZURE_SEARCH_KEY,
 }
 _missing = [name for name, value in _REQUIRED_ENV.items() if not value]
-if _missing:
+if _missing and not DEMO_MODE:
     raise RuntimeError(
         f"Missing required environment variables: {', '.join(_missing)}. "
-        "Copy .env.example to .env and fill in your Azure credentials."
+        "Copy .env.example to .env and fill in your Azure credentials, "
+        "or run with DEMO_MODE=1 for a fully local demo."
     )
+
+if DEMO_MODE:
+    logger.info("DEMO_MODE=1 - running fully locally, no Azure calls")
+    # Harmless local placeholders so client construction below succeeds
+    AZURE_SPEECH_KEY = AZURE_SPEECH_KEY or "demo"
+    AZURE_OPENAI_ENDPOINT = AZURE_OPENAI_ENDPOINT or "https://demo.local"
+    AZURE_OPENAI_KEY = AZURE_OPENAI_KEY or "demo"
+    AZURE_SEARCH_ENDPOINT = AZURE_SEARCH_ENDPOINT or "https://demo.local"
+    AZURE_SEARCH_KEY = AZURE_SEARCH_KEY or "demo"
 
 # Initialize Azure clients
 try:
@@ -264,7 +278,8 @@ rag_processor = RAGProcessor(search_client, openai_client)
 # REST API Endpoints
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+    return {"status": "healthy", "timestamp": datetime.now().isoformat(),
+            "mode": "demo" if DEMO_MODE else "live"}
 
 @app.get("/metrics")
 async def get_metrics():
@@ -281,6 +296,14 @@ async def transcribe_audio(request: TranscribeRequest):
     """Convert audio to text using Azure Speech STT"""
     try:
         start_time = datetime.now()
+
+        if DEMO_MODE:
+            return {
+                "transcription": "",
+                "reason": "DemoMode",
+                "processing_time_seconds": 0.0,
+                "note": "Cloud STT is disabled in DEMO_MODE - use the text box in the demo UI."
+            }
 
         # Convert base64 to PCM
         audio_data = AudioProcessor.base64_to_pcm(request.audio_data)
@@ -348,17 +371,22 @@ async def chat(request: ChatRequest):
 
         session = sessions[session_id]
 
-        # Retrieve RAG context
-        with pipeline_metrics.track("rag_retrieval"):
-            context = await rag_processor.retrieve_context(request.message)
+        if DEMO_MODE:
+            context = []
+            with pipeline_metrics.track("llm"):
+                response = demo_reply(request.message, session.get_context())
+        else:
+            # Retrieve RAG context
+            with pipeline_metrics.track("rag_retrieval"):
+                context = await rag_processor.retrieve_context(request.message)
 
-        # Generate response
-        with pipeline_metrics.track("llm"):
-            response = await rag_processor.generate_response(
-                request.message,
-                context,
-                session.get_context()
-            )
+            # Generate response
+            with pipeline_metrics.track("llm"):
+                response = await rag_processor.generate_response(
+                    request.message,
+                    context,
+                    session.get_context()
+                )
 
         # Update session
         session.add_message("user", request.message)
@@ -379,6 +407,16 @@ async def speak_text(request: SpeakRequest):
     """Convert text to speech using Azure Speech TTS"""
     try:
         start_time = datetime.now()
+
+        if DEMO_MODE:
+            audio = await asyncio.to_thread(demo_tts, request.text)
+            processing_time = (datetime.now() - start_time).total_seconds()
+            pipeline_metrics.record("tts", processing_time)
+            return {
+                "audio_data": AudioProcessor.pcm_to_base64(audio),
+                "processing_time_seconds": processing_time,
+                "voice": "piper-local (demo)"
+            }
 
         # Per-request config so concurrent requests can't overwrite each
         # other's voice (the global speech_config must not be mutated here)

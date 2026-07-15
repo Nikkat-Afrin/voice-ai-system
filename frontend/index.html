@@ -1,441 +1,186 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Voice AI Test Interface</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f5f5f5;
-        }
-        .container {
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        h1 {
-            color: #333;
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        .status {
-            padding: 10px;
-            margin: 10px 0;
-            border-radius: 5px;
-            font-weight: bold;
-        }
-        .status.connected {
-            background-color: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-        .status.disconnected {
-            background-color: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-        .controls {
-            display: flex;
-            gap: 10px;
-            margin: 20px 0;
-            justify-content: center;
-        }
-        button {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-            font-weight: bold;
-            transition: background-color 0.3s;
-        }
-        .btn-primary {
-            background-color: #007bff;
-            color: white;
-        }
-        .btn-primary:hover {
-            background-color: #0056b3;
-        }
-        .btn-success {
-            background-color: #28a745;
-            color: white;
-        }
-        .btn-success:hover {
-            background-color: #1e7e34;
-        }
-        .btn-danger {
-            background-color: #dc3545;
-            color: white;
-        }
-        .btn-danger:hover {
-            background-color: #c82333;
-        }
-        .btn:disabled {
-            background-color: #6c757d;
-            cursor: not-allowed;
-        }
-        .conversation {
-            margin: 20px 0;
-            padding: 20px;
-            background-color: #f8f9fa;
-            border-radius: 5px;
-            min-height: 200px;
-            max-height: 400px;
-            overflow-y: auto;
-        }
-        .message {
-            margin: 10px 0;
-            padding: 10px;
-            border-radius: 5px;
-        }
-        .message.user {
-            background-color: #e3f2fd;
-            border-left: 4px solid #2196f3;
-        }
-        .message.assistant {
-            background-color: #f3e5f5;
-            border-left: 4px solid #9c27b0;
-        }
-        .message.transcription {
-            background-color: #fff3e0;
-            border-left: 4px solid #ff9800;
-            font-style: italic;
-        }
-        .log {
-            background-color: #f8f9fa;
-            padding: 10px;
-            border-radius: 5px;
-            font-family: monospace;
-            font-size: 12px;
-            max-height: 150px;
-            overflow-y: auto;
-            margin-top: 20px;
-        }
-        .settings {
-            margin: 20px 0;
-            padding: 20px;
-            background-color: #f8f9fa;
-            border-radius: 5px;
-        }
-        .settings label {
-            display: block;
-            margin: 10px 0 5px 0;
-            font-weight: bold;
-        }
-        .settings input {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            margin-bottom: 10px;
-        }
-    </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Voice AI Assistant</title>
+<style>
+  :root {
+    --bg: #0f1420; --panel: #171e2e; --panel2: #1d2639;
+    --text: #e8edf5; --muted: #8b98ad; --accent: #4f8cff; --accent2: #7c5cff;
+    --user: linear-gradient(135deg, #4f8cff, #7c5cff); --bot: #232e46;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+         background: var(--bg); color: var(--text); height: 100vh;
+         display: flex; flex-direction: column; }
+  header { display: flex; align-items: center; gap: 14px;
+           padding: 16px 24px; background: var(--panel);
+           border-bottom: 1px solid #232d44; }
+  .logo { width: 40px; height: 40px; border-radius: 12px; flex: none;
+          background: var(--user); display: grid; place-items: center; font-size: 20px; }
+  h1 { font-size: 17px; margin: 0; }
+  .subtitle { font-size: 12px; color: var(--muted); }
+  .pill { margin-left: auto; font-size: 12px; padding: 5px 12px; border-radius: 999px;
+          background: #1c2b1e; color: #7dd87d; border: 1px solid #2c4a2e; }
+  .pill.live { background: #16233c; color: #6fa8ff; border-color: #274169; }
+  #chat { flex: 1; overflow-y: auto; padding: 26px 12%; display: flex;
+          flex-direction: column; gap: 14px; }
+  .row { display: flex; }
+  .msg { max-width: 72%; padding: 12px 16px; border-radius: 16px; line-height: 1.5;
+         font-size: 14.5px; animation: pop .18s ease-out; white-space: pre-wrap; }
+  @keyframes pop { from { transform: translateY(6px); opacity: 0; } }
+  .user { margin-left: auto; background: var(--user); border-bottom-right-radius: 4px; }
+  .bot  { background: var(--bot); border-bottom-left-radius: 4px; }
+  .meta { font-size: 11px; color: var(--muted); margin-top: 6px; display: flex;
+          align-items: center; gap: 8px; }
+  .speak { cursor: pointer; opacity: .8; }
+  .typing { display: inline-flex; gap: 4px; padding: 14px 18px; }
+  .typing span { width: 7px; height: 7px; border-radius: 50%; background: var(--muted);
+                 animation: blink 1.2s infinite; }
+  .typing span:nth-child(2) { animation-delay: .2s; }
+  .typing span:nth-child(3) { animation-delay: .4s; }
+  @keyframes blink { 0%,60%,100% { opacity: .25 } 30% { opacity: 1 } }
+  footer { padding: 16px 12% 22px; background: linear-gradient(transparent, var(--bg) 40%); }
+  .inputbar { display: flex; gap: 10px; background: var(--panel2); border-radius: 16px;
+              padding: 10px 12px; border: 1px solid #26314d; }
+  #box { flex: 1; background: none; border: none; outline: none; color: var(--text);
+         font-size: 15px; }
+  button { border: none; border-radius: 12px; cursor: pointer; font-size: 16px;
+           width: 44px; height: 40px; display: grid; place-items: center; color: white; }
+  #send { background: var(--user); }
+  #mic  { background: #2a3552; }
+  #mic.rec { background: #c0392b; animation: pulse 1s infinite; }
+  @keyframes pulse { 50% { transform: scale(1.08); } }
+  .hint { text-align: center; font-size: 11.5px; color: var(--muted); margin-top: 10px; }
+</style>
 </head>
 <body>
-    <div class="container">
-        <h1>🎤 Voice AI Test Interface</h1>
-        
-        <div id="status" class="status disconnected">
-            Disconnected from Voice AI
-        </div>
-        
-        <div class="settings">
-            <label for="serverUrl">Server URL:</label>
-            <input type="text" id="serverUrl" value="ws://localhost:8000" placeholder="ws://localhost:8000">
-            
-            <label for="sessionId">Session ID (optional):</label>
-            <input type="text" id="sessionId" placeholder="Leave empty for auto-generated">
-        </div>
-        
-        <div class="controls">
-            <button id="connectBtn" class="btn-primary" onclick="connectWebSocket()">Connect</button>
-            <button id="disconnectBtn" class="btn-danger" onclick="disconnectWebSocket()" disabled>Disconnect</button>
-            <button id="recordBtn" class="btn-success" onclick="toggleRecording()" disabled>Start Recording</button>
-            <button id="resetBtn" class="btn-primary" onclick="resetSession()" disabled>Reset Session</button>
-        </div>
-        
-        <div class="conversation" id="conversation">
-            <div class="message assistant">
-                Welcome to Voice AI! Click "Connect" to start a conversation.
-            </div>
-        </div>
-        
-        <div class="log" id="log">
-            <strong>Event Log:</strong><br>
-            Ready to connect...
-        </div>
-    </div>
+<header>
+  <div class="logo"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/></svg></div>
+  <div>
+    <h1>Voice AI Assistant</h1>
+    <div class="subtitle">FastAPI · WebSocket · STT → RAG + LLM → neural TTS</div>
+  </div>
+  <div class="pill" id="mode">…</div>
+</header>
 
-    <script>
-        let websocket;
-        let audioContext;
-        let micStream;
-        let processorNode;
-        let pcmChunks = [];
-        let isRecording = false;
-        let sessionId = null;
+<div id="chat"></div>
 
-        const TARGET_SAMPLE_RATE = 16000;
+<footer>
+  <div class="inputbar">
+    <input id="box" placeholder="Type a message, or hold the mic to speak…" autocomplete="off">
+    <button id="mic" title="Hold to talk (live mode)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/></svg></button>
+    <button id="send" title="Send"><svg width="17" height="17" viewBox="0 0 24 24" fill="white"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg></button>
+  </div>
+  <div class="hint" id="hint"></div>
+</footer>
 
-        function log(message) {
-            const logElement = document.getElementById('log');
-            const timestamp = new Date().toLocaleTimeString();
-            logElement.innerHTML += `<br>[${timestamp}] ${message}`;
-            logElement.scrollTop = logElement.scrollHeight;
-        }
+<script>
+const chat = document.getElementById("chat");
+const box = document.getElementById("box");
+const modePill = document.getElementById("mode");
+const hint = document.getElementById("hint");
+let sessionId = crypto.randomUUID();
+let demo = true;
 
-        function updateStatus(connected) {
-            const statusElement = document.getElementById('status');
-            const connectBtn = document.getElementById('connectBtn');
-            const disconnectBtn = document.getElementById('disconnectBtn');
-            const recordBtn = document.getElementById('recordBtn');
-            const resetBtn = document.getElementById('resetBtn');
+fetch("/health").then(r => r.json()).then(h => {
+  demo = h.mode !== "live";
+  modePill.textContent = demo ? "● demo mode - fully local" : "● live - Azure";
+  modePill.classList.toggle("live", !demo);
+  hint.textContent = demo
+    ? "Demo mode: rule-based assistant + local neural TTS (Piper). No cloud calls. Mic needs live mode."
+    : "Live mode: Azure Speech STT/TTS + GPT-4o with RAG.";
+  addBot("Hi! Ask me about this system's architecture, latency budget, RAG grounding, or tech stack." +
+         (demo ? " (I'm running fully offline right now.)" : ""));
+});
 
-            if (connected) {
-                statusElement.textContent = `Connected to Voice AI (Session: ${sessionId})`;
-                statusElement.className = 'status connected';
-                connectBtn.disabled = true;
-                disconnectBtn.disabled = false;
-                recordBtn.disabled = false;
-                resetBtn.disabled = false;
-            } else {
-                statusElement.textContent = 'Disconnected from Voice AI';
-                statusElement.className = 'status disconnected';
-                connectBtn.disabled = false;
-                disconnectBtn.disabled = true;
-                recordBtn.disabled = true;
-                resetBtn.disabled = true;
-                if (isRecording) {
-                    stopRecording();
-                }
-            }
-        }
+function addRow(cls, html) {
+  const row = document.createElement("div"); row.className = "row";
+  const div = document.createElement("div"); div.className = "msg " + cls;
+  div.innerHTML = html; row.appendChild(div); chat.appendChild(row);
+  chat.scrollTop = chat.scrollHeight; return div;
+}
+const addUser = t => addRow("user", esc(t));
+function addBot(t, meta) {
+  const div = addRow("bot", esc(t));
+  if (meta) { const m = document.createElement("div"); m.className = "meta"; m.innerHTML = meta; div.appendChild(m); }
+  return div;
+}
+const esc = t => t.replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
 
-        function addMessage(content, type = 'assistant') {
-            const conversationElement = document.getElementById('conversation');
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${type}`;
-            messageDiv.textContent = content;
-            conversationElement.appendChild(messageDiv);
-            conversationElement.scrollTop = conversationElement.scrollHeight;
-        }
+let typingRow = null;
+function showTyping() {
+  typingRow = addRow("bot typing", "<span></span><span></span><span></span>");
+}
+function hideTyping() { if (typingRow) { typingRow.parentElement.remove(); typingRow = null; } }
 
-        function connectWebSocket() {
-            const serverUrl = document.getElementById('serverUrl').value;
-            const sessionIdInput = document.getElementById('sessionId').value;
-            
-            sessionId = sessionIdInput || Date.now().toString();
-            const wsUrl = `${serverUrl.replace('http', 'ws')}/ws/voice/${sessionId}`;
-            
-            try {
-                websocket = new WebSocket(wsUrl);
-                
-                websocket.onopen = function(event) {
-                    log('WebSocket connected successfully');
-                    updateStatus(true);
-                    addMessage('Connected to Voice AI. You can now start recording.', 'assistant');
-                };
-                
-                websocket.onmessage = function(event) {
-                    const data = JSON.parse(event.data);
-                    log(`Received: ${data.type}`);
-                    
-                    switch (data.type) {
-                        case 'conversation_initiation_metadata':
-                            log(`Session initialized with format: ${data.supported_formats.join(', ')}`);
-                            break;
-                            
-                        case 'transcription':
-                            addMessage(`You said: "${data.text}"`, 'transcription');
-                            break;
-                            
-                        case 'audio_response':
-                            addMessage(`AI: ${data.text}`, 'assistant');
-                            if (data.sources && data.sources.length > 0) {
-                                addMessage(`Sources: ${data.sources.join(', ')}`, 'assistant');
-                            }
-                            playAudio(data.audio_data);
-                            break;
-                            
-                        case 'interruption_acknowledged':
-                            log('Interruption acknowledged');
-                            break;
-                            
-                        case 'error':
-                            addMessage(`Error: ${data.message}`, 'assistant');
-                            log(`Error: ${data.message}`);
-                            break;
-                            
-                        default:
-                            log(`Unknown message type: ${data.type}`);
-                    }
-                };
-                
-                websocket.onclose = function(event) {
-                    log('WebSocket connection closed');
-                    updateStatus(false);
-                    addMessage('Connection lost. Please reconnect.', 'assistant');
-                };
-                
-                websocket.onerror = function(error) {
-                    log(`WebSocket error: ${error}`);
-                    updateStatus(false);
-                    addMessage('Connection error. Please check your settings.', 'assistant');
-                };
-                
-            } catch (error) {
-                log(`Connection error: ${error.message}`);
-                addMessage('Failed to connect. Please check the server URL.', 'assistant');
-            }
-        }
+async function send() {
+  const text = box.value.trim(); if (!text) return;
+  box.value = ""; addUser(text); showTyping();
+  const t0 = performance.now();
+  try {
+    const chatRes = await fetch("/chat", { method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ message: text, session_id: sessionId }) }).then(r => r.json());
+    const tChat = performance.now();
+    const speakRes = await fetch("/speak", { method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ text: chatRes.response }) }).then(r => r.json());
+    const tAll = performance.now();
+    hideTyping();
+    const meta = `chat ${(tChat - t0).toFixed(0)} ms · voice ${(tAll - tChat).toFixed(0)} ms` +
+                 ` · <span class="speak" title="Replay audio">&#9654; replay</span>`;
+    const div = addBot(chatRes.response, meta);
+    const audio = new Audio("data:audio/wav;base64," + speakRes.audio_data);
+    audio.play().catch(() => {});
+    div.querySelector(".speak").onclick = () => audio.play();
+  } catch (e) { hideTyping(); addBot("Error: " + e.message); }
+}
+document.getElementById("send").onclick = send;
+box.addEventListener("keydown", e => { if (e.key === "Enter") send(); });
 
-        function disconnectWebSocket() {
-            if (websocket) {
-                websocket.close();
-                websocket = null;
-            }
-        }
-
-        function resetSession() {
-            if (websocket && sessionId) {
-                fetch(`/reset?session_id=${sessionId}`, { method: 'POST' })
-                    .then(response => response.json())
-                    .then(data => {
-                        addMessage('Session reset successfully.', 'assistant');
-                        document.getElementById('conversation').innerHTML = '';
-                        addMessage('Session reset. You can start a new conversation.', 'assistant');
-                    })
-                    .catch(error => {
-                        log(`Reset error: ${error.message}`);
-                        addMessage('Failed to reset session.', 'assistant');
-                    });
-            }
-        }
-
-        function playAudio(base64Audio) {
-            try {
-                const audioData = atob(base64Audio);
-                const audioArray = new Uint8Array(audioData.length);
-                for (let i = 0; i < audioData.length; i++) {
-                    audioArray[i] = audioData.charCodeAt(i);
-                }
-                
-                const audioBlob = new Blob([audioArray], { type: 'audio/wav' });
-                const audioUrl = URL.createObjectURL(audioBlob);
-                const audio = new Audio(audioUrl);
-                audio.play();
-                
-                log('Playing audio response');
-            } catch (error) {
-                log(`Audio playback error: ${error.message}`);
-            }
-        }
-
-        // Capture raw PCM (16 kHz, 16-bit, mono) — the format the server's
-        // Azure Speech push stream expects. MediaRecorder is NOT used because
-        // it produces compressed webm/opus, which Azure can't decode as PCM.
-        function startRecording() {
-            navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, sampleRate: TARGET_SAMPLE_RATE } })
-                .then(stream => {
-                    micStream = stream;
-                    audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: TARGET_SAMPLE_RATE });
-                    const source = audioContext.createMediaStreamSource(stream);
-                    processorNode = audioContext.createScriptProcessor(4096, 1, 1);
-                    pcmChunks = [];
-
-                    processorNode.onaudioprocess = function(event) {
-                        // Copy the Float32 samples (the buffer is reused by the browser)
-                        pcmChunks.push(new Float32Array(event.inputBuffer.getChannelData(0)));
-                    };
-
-                    source.connect(processorNode);
-                    processorNode.connect(audioContext.destination);
-
-                    isRecording = true;
-                    document.getElementById('recordBtn').textContent = 'Stop Recording';
-                    document.getElementById('recordBtn').className = 'btn-danger';
-                    log(`Started recording (PCM ${audioContext.sampleRate} Hz)`);
-                })
-                .catch(error => {
-                    log(`Recording error: ${error.message}`);
-                    addMessage('Failed to start recording. Please check microphone permissions.', 'assistant');
-                });
-        }
-
-        function floatTo16BitPCM(float32Arrays) {
-            const totalLength = float32Arrays.reduce((sum, a) => sum + a.length, 0);
-            const pcm16 = new Int16Array(totalLength);
-            let offset = 0;
-            for (const chunk of float32Arrays) {
-                for (let i = 0; i < chunk.length; i++) {
-                    const s = Math.max(-1, Math.min(1, chunk[i]));
-                    pcm16[offset++] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-                }
-            }
-            return pcm16;
-        }
-
-        function arrayBufferToBase64(buffer) {
-            const bytes = new Uint8Array(buffer);
-            let binary = '';
-            const chunkSize = 0x8000; // avoid call-stack limits on large buffers
-            for (let i = 0; i < bytes.length; i += chunkSize) {
-                binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
-            }
-            return btoa(binary);
-        }
-
-        function stopRecording() {
-            if (!isRecording) return;
-
-            if (processorNode) {
-                processorNode.disconnect();
-                processorNode = null;
-            }
-            if (micStream) {
-                micStream.getTracks().forEach(track => track.stop());
-                micStream = null;
-            }
-            if (audioContext) {
-                audioContext.close();
-                audioContext = null;
-            }
-
-            const pcm16 = floatTo16BitPCM(pcmChunks);
-            pcmChunks = [];
-
-            if (pcm16.length > 0 && websocket && websocket.readyState === WebSocket.OPEN) {
-                const base64Audio = arrayBufferToBase64(pcm16.buffer);
-                websocket.send(JSON.stringify({
-                    type: 'audio_chunk',
-                    data: base64Audio
-                }));
-                log(`Sent audio chunk (${pcm16.length} samples)`);
-            }
-
-            isRecording = false;
-            document.getElementById('recordBtn').textContent = 'Start Recording';
-            document.getElementById('recordBtn').className = 'btn-success';
-            log('Stopped recording');
-        }
-
-        function toggleRecording() {
-            if (!isRecording) {
-                startRecording();
-            } else {
-                stopRecording();
-            }
-        }
-
-        // Auto-connect on page load if server is available
-        window.addEventListener('load', function() {
-            log('Voice AI Test Interface loaded');
-        });
-    </script>
+// --- mic: PCM capture -> /converse (live mode) ---------------------------
+const micBtn = document.getElementById("mic");
+let mediaStream, audioCtx, processor, chunks = [];
+micBtn.addEventListener("mousedown", startRec);
+micBtn.addEventListener("mouseup", stopRec);
+async function startRec() {
+  if (demo) { hint.textContent = "Mic streaming needs live Azure mode - use the text box in this demo."; return; }
+  mediaStream = await navigator.mediaDevices.getUserMedia({ audio: { sampleRate: 16000, channelCount: 1 } });
+  audioCtx = new AudioContext({ sampleRate: 16000 });
+  const src = audioCtx.createMediaStreamSource(mediaStream);
+  processor = audioCtx.createScriptProcessor(4096, 1, 1);
+  chunks = [];
+  processor.onaudioprocess = e => {
+    const f32 = e.inputBuffer.getChannelData(0);
+    const i16 = new Int16Array(f32.length);
+    for (let i = 0; i < f32.length; i++) i16[i] = Math.max(-1, Math.min(1, f32[i])) * 32767;
+    chunks.push(i16);
+  };
+  src.connect(processor); processor.connect(audioCtx.destination);
+  micBtn.classList.add("rec");
+}
+async function stopRec() {
+  if (!mediaStream) return;
+  micBtn.classList.remove("rec");
+  processor.disconnect(); mediaStream.getTracks().forEach(t => t.stop()); audioCtx.close();
+  const total = chunks.reduce((n, c) => n + c.length, 0);
+  const pcm = new Int16Array(total); let off = 0;
+  chunks.forEach(c => { pcm.set(c, off); off += c.length; });
+  const b64 = btoa(String.fromCharCode(...new Uint8Array(pcm.buffer)));
+  showTyping();
+  const res = await fetch("/converse", { method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ audio_data: b64, session_id: sessionId }) }).then(r => r.json());
+  hideTyping();
+  addUser(res.transcription || "(no speech detected)");
+  const lat = res.latency_seconds;
+  const meta = lat ? `stt ${(lat.stt*1000).toFixed(0)} ms · chat ${(lat.chat*1000).toFixed(0)} ms · voice ${(lat.tts*1000).toFixed(0)} ms` : "";
+  addBot(res.response, meta);
+  new Audio("data:audio/wav;base64," + res.audio_data).play().catch(() => {});
+  mediaStream = null;
+}
+</script>
 </body>
-</html> 
+</html>

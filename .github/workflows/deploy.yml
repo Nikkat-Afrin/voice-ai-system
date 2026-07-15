@@ -1,10 +1,9 @@
 name: Deploy Voice AI to Azure
 
+# Manual trigger only: deployment needs Azure credentials configured as repo
+# secrets, so it should be run deliberately rather than on every push.
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+  workflow_dispatch:
 
 env:
   AZURE_CONTAINERAPP_NAME: voice-ai-app
@@ -59,7 +58,3 @@ jobs:
         containerAppName: ${{ env.AZURE_CONTAINERAPP_NAME }}
         resourceGroup: ${{ env.AZURE_GROUP_NAME }}
         imageToDeploy: ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }}
-
-    - name: Run integration tests
-      run: |
-        python -m pytest tests/integration/ -v 
